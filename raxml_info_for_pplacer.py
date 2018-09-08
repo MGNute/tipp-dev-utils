@@ -1,4 +1,7 @@
-import re, os, sys
+import re, os, sys, shutil
+
+model_fi=os.path.join(os.path.split(os.path.abspath(__file__))[0],'raxml_info_model.txt')
+
 
 def make_empty_subvals():
     subvals = {'ALNPATTERNS' : None,
@@ -21,15 +24,7 @@ def make_empty_subvals():
             'GTGTR' : None}
     return subvals
 
-# test_fold = 'C:\\Users\\miken\\Dropbox\\GradSchool\\Phylogenetics\\work\\bimodal-msa\\tipp_cogs'
-# test_opt = 'RAxML_info.optimized'
-# test_ref = 'RAxML_info.refined'
-#
-# test_opt_f = open(os.path.join(test_fold,test_opt),'r')
-# test_opt_str = test_opt_f.read()
-# test_opt_f.close()
-
-def populate_subvals(raxml_info_optimized_file):
+def populate_subvals(raxml_info_optimized_file,st=False):
     regex_gtr = ''
     regex_gtr = regex_gtr + 'alpha: (?P<ALPHA>\d+\.\d+[E\-*\d]*)\n'
     regex_gtr = regex_gtr + 'Tree-Length: \d+\.\d+[E\-*\d]\n'
@@ -47,9 +42,13 @@ def populate_subvals(raxml_info_optimized_file):
 
     subvals = make_empty_subvals()
 
-    test_opt_f = open(raxml_info_optimized_file,'r')
-    test_opt_str = test_opt_f.read()
-    test_opt_f.close()
+    if not st:
+        test_opt_f = open(raxml_info_optimized_file,'r')
+        test_opt_str = test_opt_f.read()
+        test_opt_f.close()
+    else:
+        test_opt_str = raxml_info_optimized_file
+
 
     # GTR parameters
     gtr_re = re.compile(regex_gtr)
@@ -131,7 +130,17 @@ This script makes a new RAxML_info file that is suitable for use with pplacer fr
     '-f -e ' model to optimize branch lengths and model parameters.
 
     usage: python raxml_info_for_pplacer.py <raw_raxml_file> <model_raxml_file> <destination_file>
+    
+        <destionation_file> is optional. Omitting it will cause a backup called <raw_raxml_file>.bkp to
+            be generated in the same folder as the original, and then the <raw_raxml_file> to be 
+            replaced.
 ''')
+
+def backup_old_file(pth):
+    fo, fi = os.path.split(pth)
+    bkp = fi + '.bkp'
+    shutil.copy(pth,os.path.join(fo,bkp))
+
 
 if __name__=='__main__':
     if '-h' in sys.argv or '--help' in sys.argv:
@@ -140,7 +149,13 @@ if __name__=='__main__':
     else:
         old_fi = sys.argv[1]
         model_fi = sys.argv[2]
-        new_fi = sys.argv[3]
+        if len(sys.argv)>3:
+            new_fi = sys.argv[3]
+        else:
+            print('NOTE: no third argument was given, so we will make these changes in place and save a '
+                  'backup in the same folder as the original.')
+            backup_old_file(old_fi)
+            new_fi = old_fi
         subvals = populate_subvals(old_fi)
         make_new_raxml_info_file(new_fi,model_fi,subvals)
         sys.exit(0)
