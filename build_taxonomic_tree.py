@@ -6,9 +6,11 @@ Created on Jan 31, 2012
 python2.7 build_taxonomic_tree.py ../data/taxonomy/all_taxon.taxonomy taxonomic.tree
 python2.7 build_taxonomic_tree.py ../data/taxonomy/all_taxon.taxonomy taxonomic.tree ../data/taxonomy/species.mapping
 
+Converted for use in Python 3 by Mike Nute some time in 2018.
+
 @author: namphuon
 '''
-from dendropy import Tree, Node
+from dendropy import Tree, Node, Taxon
 import sys
 import os
 
@@ -24,11 +26,11 @@ if __name__ == '__main__':
     species[line.strip()] = line.strip()
     
   lines = open(taxonomyFile,'r')
-  header = lines.next()
+  header = lines.readline()
   nodes_dict = {}
 
   #Read first line, root node
-  line = lines.next()
+  line = lines.readline()
   results = line.strip().split(',')
   tree = Tree()  
   root = Node()
@@ -38,11 +40,12 @@ if __name__ == '__main__':
   prune = ['1']
   
   #Add root node to tree
-  tree.__dict__['seed_node'].add_child(root)
+  tree.__dict__['_seed_node'].add_child(root)
   for line in lines:
     results = line.strip().split(',')
     node = Node();
     node.__dict__['label'] = results[0].replace("\"","")
+    node.taxon = Taxon(results[0].replace("\"",""))
     nodes_dict[results[0].replace("\"","")] = node
     nodes_dict[results[1].replace("\"","")].add_child(node)
     if results[0].replace("\"","") not in species:
@@ -50,7 +53,8 @@ if __name__ == '__main__':
       
   for taxa in prune:
     nodes_dict[taxa].label=''
-  tree.delete_outdegree_one_nodes()
+  # tree.delete_outdegree_one_nodes()
+  tree.suppress_unifurcations()
       
   output = open(taxonomyTree, 'w')
   output.write(str(tree) + ";");

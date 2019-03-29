@@ -1,3 +1,14 @@
+'''
+Creates a RAxML_info file in a format that pplacer can digest. Unfortunately giving
+    pplacer a file like this is deprecated but maintained for compatibility, but the
+    RAxML_info file structure has changed and must be translated to the old form to
+    use in TIPP.
+
+    This basically just takes an old output file as a dummy and does some regex work
+    to replace the relevant spots with corresponding data from the new file. That
+    means that the result is basically a fake RAxML_info file with real data, so it
+    shouldn't be interpreted beyond its intended use.
+'''
 import re, os, sys, shutil
 
 model_fi=os.path.join(os.path.split(os.path.abspath(__file__))[0],'raxml_info_model.txt')
@@ -129,11 +140,13 @@ This script makes a new RAxML_info file that is suitable for use with pplacer fr
     in a differnt format. Currently it is set up to convert files created by running raxml 8.2.9 with the
     '-f -e ' model to optimize branch lengths and model parameters.
 
-    usage: python raxml_info_for_pplacer.py <raw_raxml_file> <model_raxml_file> <destination_file>
+    usage: python raxml_info_for_pplacer.py <raw_raxml_file> <destination_file>
     
         <destionation_file> is optional. Omitting it will cause a backup called <raw_raxml_file>.bkp to
             be generated in the same folder as the original, and then the <raw_raxml_file> to be 
             replaced.
+        (Note that a previous version of this file also required the model file as input, but now it is provided
+        as part of the tipp_dev_utils repo.)
 ''')
 
 def backup_old_file(pth):
@@ -148,11 +161,11 @@ if __name__=='__main__':
         sys.exit(0)
     else:
         old_fi = sys.argv[1]
-        model_fi = sys.argv[2]
-        if len(sys.argv)>3:
-            new_fi = sys.argv[3]
+        # model_fi = sys.argv[2]
+        if len(sys.argv)>2:
+            new_fi = sys.argv[2]
         else:
-            print('NOTE: no third argument was given, so we will make these changes in place and save a '
+            print('NOTE: no second argument was given, so we will make these changes in place and save a '
                   'backup in the same folder as the original.')
             backup_old_file(old_fi)
             new_fi = old_fi

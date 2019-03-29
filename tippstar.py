@@ -1,39 +1,64 @@
 __author__ = 'Michael'
+__doc__ = '''
+tippstar.py:    A collection of scratchwork and subroutines used to generate the
+    TIPP reference packages from a collection of genbank files downloaded from refseq.
+    Most of these functions were written in 2015, but were revised for the effort in
+    2018-2019.
+'''
 
 import sys
 sys.path.append('/projects/tallis/nute/code/') #phylogeny_utilities')
 # print sys.path
 
 from phylogeny_utilities.utilities import *
+from Bio import SeqIO
 
 testfile = '/projects/tallis/nute/data/ncbi/genomes/data/Yersinia_enterocolitica_palearctica_105_5R_r__uid63663/NC_015224.gbk'
 
-import re, os, multiprocessing
+import re, os, multiprocessing, datetime
 
 # errsfile = open('/projects/tallis/nute/data/gi-errlines.txt','w')
+gff_folder = '/projects/tallis/nute/work/metagenomics/tippstar/refpkg_2018/gff_files'
+work = '/projects/tallis/nute/work/metagenomics/tippstar/refpkg_2018'
+tipp2018='/projects/tallis/nute/data/tippref_2018'
+
+
 
 def make_giant_cds_dna_fasta():
-    prefix = '/projects/tallis/nute/data/ncbi-2017/'
-    f_prefix = '/projects/tallis/nute/work/metagenomics/tippstar/2017/gbff_files/'
-    filelist = open(prefix + 'file-list.txt','r')
-    filelist_lookup = open(prefix + 'file-list-lookup.txt','w')
+    '''
+    This is the one that processes the big faa and fna files that fetchMG will use
+    :return:
+    '''
+    # prefix = '/projects/tallis/nute/data/ncbi-2017/'
+    prefix = tipp2018
+    # f_prefix = '/projects/tallis/nute/work/metagenomics/tippstar/2017/gbff_files/'
+    f_prefix = '/scratch/users/nute2/refseq_gbff'
+
+    # filelist = open(os.path.join(prefix , 'gbff-file-list.txt'),'r')
+    filelist_lookup = open(os.path.join(prefix ,'refseq_intermediate_files', 'file-list-lookup.txt'),'w')
     filelist_dict = {}
-    big_cds = open(prefix + 'ncbi_all_sequences.faa','w')
-    big_dna = open(prefix + 'ncbi_all_sequences.fna','w')
-    big_trerrs = open(prefix + 'ncbi-translation-errors.txt','w')
-    big_lerrs = open(prefix + 'ncbi-length-errrors.txt','w')
+    big_cds = open(os.path.join(prefix ,'refseq_intermediate_files', 'ncbi_all_sequences.faa'),'w')
+    big_dna = open(os.path.join(prefix ,'refseq_intermediate_files', 'ncbi_all_sequences.fna'),'w')
+    big_namedata = open(os.path.join(prefix ,'refseq_intermediate_files', 'ncbi_all_sequences_name_pos.txt'), 'w')
+    big_trerrs = open(os.path.join(prefix ,'refseq_intermediate_files', 'ncbi-translation-errors.txt'),'w')
+    big_lerrs = open(os.path.join(prefix , 'refseq_intermediate_files', 'ncbi-length-errrors.txt'),'w')
+    big_name_map = open(os.path.join(prefix , 'refseq_intermediate_files', 'nute_old_name_to_fetchMG_name_map.txt'),'w')
 
     counter = 0
 
-    files = get_list_from_file(prefix + 'file-list.txt')
-    print "got file list..."
-    filesfull = []
-    for i in files:
-        filesfull.append(f_prefix + i)
-    print "created full list of files (filesfull)"
+    # get the set of files we're gonna use:
+    files = get_list_from_file(prefix + '/gbff-file-list.txt')
+    print ("got file list...")
+    filesfull = list(map(lambda x: os.path.join(f_prefix,x),files))
+    # for i in files:
+        # filesfull.append(f_prefix + i)
+    print ("created full list of files (filesfull, %s files)" % len(filesfull))
+    st_time = datetime.datetime.now()
+    last = datetime.datetime.now()
 
-    p = multiprocessing.Pool(24)
-    for i in range(83):
+    p = multiprocessing.Pool(20)
+    num_grps = int(len(filesfull)/1000)+1
+    for i in range(num_grps):
         mn = i * 1000
         if (i+1) * 1000 > len(filesfull):
             mx = len(filesfull)
@@ -41,40 +66,70 @@ def make_giant_cds_dna_fasta():
             mx = (i+1) * 1000
 
         results = p.map(bp_genbank_get_CDS_dict,filesfull[mn:mx])
-        print "got CDS dict for i=%s" % i
+        # rnd_start = datetime.datetime.now()
+        print ("got CDS dict for i=%s\t\t\t%s" % (i,datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
 
         for fi in results:
             counter += 1
             # if counter % 10000 == 0:
             #     print '\t%s files done' % counter
-            record_file_results(big_cds, big_dna, big_lerrs, big_trerrs, counter, fi, filelist_dict, filelist_lookup)
-        print '\tDone writing for i=%s'
-
+            record_file_results(big_cds, big_dna, big_namedata, big_lerrs,
+                                big_trerrs, big_name_map, counter, fi, filelist_dict, filelist_lookup)
+        done_at = datetime.datetime.now()
+        print ('   ...Done writing for i=%s\t\t%s' % (i,done_at.strftime('%Y-%m-%d %H:%M:%S')))
+        print ('           last 1k batch took: %s\t time since start: %s' % (done_at-last,done_at-st_time))
+        last = datetime.datetime.now()
     filelist_lookup.close()
     big_cds.close()
     big_dna.close()
+    big_namedata.close()
     big_trerrs.close()
     big_lerrs.close()
 
 
-def record_file_results(big_cds, big_dna, big_lerrs, big_trerrs, counter, fi, filelist_dict, filelist_lookup):
+def record_file_results(big_cds, big_dna, big_namedata, big_lerrs, big_trerrs, big_name_map, counter, fi, filelist_dict, filelist_lookup):
+    '''
+
+    :param big_cds: single large output file
+    :param big_dna: single large output file for nuke seqs
+    :param big_namedata: single large output file for name and location info
+    :param big_lerrs: single large output file
+    :param big_trerrs: single large output file
+    :param big_name_map: mapping between old sequence ID and fetchMG sequence ID
+    :param counter: integer to keep track of where we are
+    :param fi: results from bp_genbank function in utilites file. contains:
+
+    :param filelist_dict: dict object keeping ongoing file index and filepath
+    :param filelist_lookup: file where the same info is being written as it goes
+    :return:
+    '''
     cds = fi[0]
     dna = fi[1]
-    sten = fi[2]
+    name_pos = fi[2]
     trerrs = fi[3]
     lerrs = fi[4]
     fn = fi[5]
+
+    namedata_line = '\t'.join(['%s',]*8) + '\n'
+    # going to write: ((filename, proteinID) + (6 fields from name_pos)
+    # going to write: ((filename, proteinID) + (seqid, gene, st, en, dir, gene_synonyms))
+
     # fn = prefix + fi.strip()
     filelist_lookup.write(str(counter) + '\t' + fn + '\n')
     # print str(counter) + '\t' + fi.strip()
     filelist_dict[counter] = fn
     # cds, dna, sten, trerrs, lerrs = bp_genbank_get_CDS_dict(fn)
     for locus in cds.keys():
-        big_cds.write('>' + str(counter) + '_' + locus + '\n')
+        # big_cds.write('>' + str(counter) + '_' + locus + '\n')
+        big_cds.write('>' + name_pos[locus][6] + '\n')
         big_cds.write(cds[locus] + '\n')
     for locus in dna.keys():
-        big_dna.write('>' + str(counter) + '_' + locus + '\n')
+        # big_dna.write('>' + str(counter) + '_' + locus + '\n')
+        big_dna.write('>' + name_pos[locus][6] + '\n')
         big_dna.write(str(dna[locus]) + '\n')
+    for locus in name_pos.keys():
+        big_namedata.write(namedata_line % ((fn,locus ) + name_pos[locus][0:6]))
+        big_name_map.write(str(counter) + '_' + locus + '\t' + name_pos[locus][6] + '\n')
     for trerr in trerrs:
         big_trerrs.write(str(counter) + '_' + trerr + '\n')
     for lerr in lerrs:
@@ -103,7 +158,7 @@ def get_file_taxid_map():
                 tid = result.group('tid')
                 outdict[f]=tid
             except:
-                print i
+                print (i)
 
     fi.close()
     return outdict
@@ -158,7 +213,7 @@ def make_species_mapping_per_cog():
     sm = read_species_mapping_to_dict()
 
     for i in cog_list:
-        print i
+        print (i)
         outfile = open(outpref + i + '/species.mapping','w')
         taxa = get_list_from_file(prefix + i + '-taxa.txt')
         for j in taxa:
@@ -183,7 +238,7 @@ def get_gi(str_test):
         return (l,v,g)
     except:
         errsfile.write(str_test)
-        print "ERROR: %s" %str_test[0:100]
+        print ("ERROR: %s" %str_test[0:100])
         return (None, None, None)
 
 
@@ -192,7 +247,7 @@ def replace_sequence_header_perl(loc,ver,gi):
     try:
         assert os.path.exists(fileloc)==True
     except:
-        print "%s is not a valid file" % loc
+        print("%s is not a valid file" % loc)
         return None
 
     # fasta=open(fileloc,'r')
@@ -259,22 +314,78 @@ def rename_fastaheaders_in_krakendb():
 
     for ln in mf:
         (i,j,k) = get_gi(ln)
-        if i <> None:
+        if i != None:
             cmd = replace_sequence_header_perl(i,j,k)
             sf.write(cmd + '\n')
 
     mf.close()
     sf.close()
 
+#
+# From ehre down is all 2018 Code
+#
+
+def proc_line(a):
+    '''
+    helper function for the one below
+    :param a:
+    :return:
+    '''
+    b = a.strip().split('\t')
+    if b[2]=='CDS':
+        c = b[8].split(';')
+        d = dict(map(lambda x: (x.split('=')[0], x.split('=')[1]), c))
+        if 'gene' in d.keys():
+            return (b[0],b[2], b[3], b[4], b[5], b[6], b[7], d['gene'],
+                    d.get('Name',None))
+    return None
+
+def get_gene_names_from_gff_files(part):
+    '''
+    Goes through all the gff files and tallies up the genes where the gene has
+    a name. Outputs this to a single file for analysis.
+    :return:
+    '''
+    gff_folder = '/projects/tallis/nute/work/metagenomics/tippstar/refpkg_2018/gff_files'
+    work = '/projects/tallis/nute/work/metagenomics/tippstar/refpkg_2018'
+
+    out=open(os.path.join(work,'gene_name_usage','gene_name_usages_list_%s.txt' % part),'w')
+    # flist = os.listdir(gff_folder)[]
+    flist_full = get_list_from_file(os.path.join(work,'gff_file_list.txt'))
+    flist=flist_full[part::20]
+    blankline= '\t'.join(['%s',]*10) + '\n'
+    for fn in flist:
+        refseqid = fn.replace('_genomic.gff.gz','')
+        # print(refseqid)
+        os.system('gunzip -c %s | grep \'^#\' -v > /dev/shm/test_%s.txt' % (os.path.join(gff_folder,fn),str(part)))
+        mygff=open('/dev/shm/test_%s.txt' % str(part),'r')
+        lns = mygff.readlines()
+        mygff.close()
+        g_name_lines = filter(lambda x: x is not None, map(proc_line,[li for li in lns if len(li)>1]))
+        for gl in g_name_lines:
+            ln=out.write(blankline % ((refseqid,) + gl))
+        os.system('rm /dev/shm/test_%s.txt' % str(part))
+
+    out.close()
+    print('done with part %s' % part)
+
+def get_gene_names_multiproc():
+    p = multiprocessing.Pool(20)
+    p.map(get_gene_names_from_gff_files,range(20))
+
+
 # seq = enumerate(SeqIO.parse(testfile,"genbank"))
 # ind, rec = seq.next()
 
 if __name__=='__main__':
-    pass
     # (lo, ve, gi) = get_gi(teststr2)
     # print replace_sequence_header_perl(lo, ve, gi)
 
     # rename_fastaheaders_in_kradendb()
-    make_giant_cds_dna_fasta()
+    # make_giant_cds_dna_fasta()
     # make_species_mapping()
     # make_species_mapping_per_cog()
+
+    #2018:
+    # get_gene_names_multiproc()  # done successfully
+    make_giant_cds_dna_fasta()
