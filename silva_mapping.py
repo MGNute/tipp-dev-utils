@@ -1,3 +1,7 @@
+'''
+This was written in an effort to make a TIPP reference out of the SILVA data, unfortunately
+    that ended in failure because mapping from SILVA to NCBI Taxonomy is not well-defined.
+'''
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
 import re, json, sys, os
@@ -104,10 +108,10 @@ def get_file_CDS_to_ncbi_taxid_dict(id):
     for sr in si:
         acc = None
         if sr.features[0].type != 'source':
-            print "%s - record: %s does not have a source" % (fi, sr.id)
+            print ("%s - record: %s does not have a source" % (fi, sr.id))
             continue
         elif 'db_xref' not in sr.features[0].qualifiers.keys():
-            print "%s - record: %s does not have field called db_xref" % (fi, sr.id)
+            print( "%s - record: %s does not have field called db_xref" % (fi, sr.id))
             continue
         else:
             for dx in sr.features[0].qualifiers['db_xref']:
@@ -115,7 +119,7 @@ def get_file_CDS_to_ncbi_taxid_dict(id):
                     acc = dx.replace('taxon:','')
                     continue
             if acc is None:
-                print "%s - record: %s does not have a db_xref entry for taxon" % (fi, sr.id)
+                print ("%s - record: %s does not have a db_xref entry for taxon" % (fi, sr.id))
                 continue
 
 
@@ -141,7 +145,7 @@ def get_all_files_in_list(file_list):
     outf = open(file_list + '_ncbi.json', 'w')
     json.dump(all_dict,outf)
     outf.close()
-    print '%s done' % file_list
+    print ('%s done' % file_list)
 
 # def get_full_cds_dict():
 #     str_name = '/projects/tallis/nute/data/ncbi-2017/partial_cog_uniq/all_cog_uniq_file_ids_'
@@ -170,7 +174,7 @@ def get_full_cds_dict():
     full = json.load(myf)
     myf.close()
     # print "loaded full_cds_dict.json"
-    print "loaded full_cds_dict_ncbi.json"
+    print ("loaded full_cds_dict_ncbi.json")
     return full
 
 def make_cog_insdn_map(cog_file, insdn_lookup):
@@ -226,9 +230,9 @@ def make_file_seq_accn_taxid_lookup():
             lct +=1
         fct +=1
         if fct % 1000 == 0:
-            print fct
+            print (fct)
     outf.close()
-    print 'wrote %s lines' % lct
+    print ('wrote %s lines' % lct)
 
 def make_accn_taxid_lookup():
     '''
@@ -249,14 +253,14 @@ def make_accn_taxid_lookup():
                 accns[tax_accn[1]].add(tax_accn[0])
         fct +=1
         if fct % 1000 ==0:
-            print 'file ct:\t%s' % fct
-    print 'final step ....'
+            print ('file ct:\t%s' % fct)
+    print ('final step ....')
     accnct = 0
     for i in accns.keys():
         outf.write('%s,%s,%s\n' % (i, len(foo), ','.join(list(accns[i]))))
         accnct+=1
         if accnct % 20000 == 0:
-            print 'accn ct:\t%s' % accnct
+            print ('accn ct:\t%s' % accnct)
     outf.close()
 
 if __name__=='__main__':

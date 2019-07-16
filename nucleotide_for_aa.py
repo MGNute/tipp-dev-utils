@@ -1,7 +1,12 @@
+'''
+Most of what is in here was used in 2017 but I am moving over to a different process in 2019 that will
+be a little more aware. See 'codon_aa_substitutions.py'.
+'''
 from phylogeny_utilities.utilities import *
 import subprocess as sp
 import sys
 from multiprocessing import Pool
+nproc = 20
 
 codon_lookup = {'GCT':'A','GCC':'A','GCA':'A','GCG':'A','CGT':'R','CGC':'R','CGA':'R','CGG':'R',
                     'AGA':'R','AGG':'R','AAT':'N','AAC':'N','GAT':'D','GAC':'D','TGT':'C','TGC':'C',
@@ -73,6 +78,13 @@ reverse_lookup = {  'F': 'TT*',
 #     #     print 'error count: %s' % err_ct
 #     return out_str, err_ct
 def string_aa_to_nukes(aa_aln, nuc_raw):
+    '''
+    takes an aligned amino acid string and an unaligned corresponding nucleotide sting and returns
+    the aligned version of the nucleotide string
+    :param aa_aln:
+    :param nuc_raw:
+    :return:
+    '''
     out_str = ''
     pseudo_gene = get_pseudo_nuke_string_from_aa(aa_aln.replace('-',''))
     p = sp.Popen(['/projects/tallis/nute/code/misc_c_utilities/nw'], stdin=sp.PIPE, stdout=sp.PIPE, stderr=sp.PIPE)
@@ -113,6 +125,11 @@ def string_aa_to_nukes(aa_aln, nuc_raw):
 
 
 def get_pseudo_nuke_string_from_aa(aminostring):
+    '''
+
+    :param aminostring:
+    :return:
+    '''
     out_str = ''
     for i in range(len(aminostring)):
         if aminostring[i] in reverse_lookup.keys():
@@ -125,33 +142,33 @@ def make_nuke_alignment_from_aa(aminofile, nucfile, nuc_aligned_out):
     mypool=Pool(20)
     aa = read_from_fasta(aminofile)
     nuc_raw = read_from_fasta(nucfile)
-    if len(aa.keys())<>len(nuc_raw.keys()):
-        print 'Sequence counts do not match between files: %s in AA file, %s in nucleotide file...' % (len(aa.keys()),len(nuc_raw.keys()))
+    if len(aa.keys())!=len(nuc_raw.keys()):
+        print ('Sequence counts do not match between files: %s in AA file, %s in nucleotide file...' % (len(aa.keys()),len(nuc_raw.keys())))
 
     mm_names =len(set(aa.keys()).symmetric_difference(set(nuc_raw.keys())))
-    if mm_names<>0:
+    if mm_names!=0:
         # print 'Sequence names are not exactly the same between files: %s names in only one file...terminating'
         intersect_keys = list(set(aa.keys()).intersection(set(nuc_raw.keys())))
-        print 'Sequence names are not exactly the same between files. Output will match the intersection of the two.'
+        print('Sequence names are not exactly the same between files. Output will match the intersection of the two.')
         out_nuc = dict.fromkeys(intersect_keys)
     else:
         out_nuc = dict.fromkeys(aa.keys())
     seq_ct = len(out_nuc.keys())
-    print 'total of %s sequences' % seq_ct
+    print ('total of %s sequences' % seq_ct)
     ct = 0
     arglist = []
     for k in out_nuc.keys():
         # ec = 0
         arglist.append((aa[k],nuc_raw[k],k))
         # newstr = string_aa_to_nukes(aa[k],nuc_raw[k])
-    print 'starting pool....'
+    print ('starting pool....')
     res = mypool.map(string_aa_to_nukes_intermediate,arglist)
-    print '\t\t...done running pool'
+    print ('\t\t...done running pool')
 
     for i in range(len(arglist)):
         k=arglist[i][2]
         if res[i] == False:
-            print 'error occured on key %s...terminating' % k
+            print ('error occured on key %s...terminating' % k)
             return False
         out_nuc[k] = res[i]
         # ct +=1
@@ -159,11 +176,11 @@ def make_nuke_alignment_from_aa(aminofile, nucfile, nuc_aligned_out):
         #     print '%s done' % ct
 
     maxlen = max(map(len,out_nuc.values()))
-    print "max length: %s" % maxlen
+    print ("max length: %s" % maxlen)
     for i in out_nuc.keys():
         leni = len(out_nuc[i])
         out_nuc[i] += '-'*(maxlen-leni)
-    print "min length: %s" % min(map(len,out_nuc.values()))
+    print ("min length: %s" % min(list(map(len,out_nuc.values()))))
     # assert min(map(len,out_nuc.values()))==max(map(len,out_nuc.values())), 'final fasta does not all have same values'
     write_to_fasta(nuc_aligned_out, out_nuc)
 
@@ -257,11 +274,11 @@ if __name__=='__main__':
         outfi = sys.argv[3]
 
     if '-h' in [aafi, nucfi, outfi]:
-        print '''
+        print ('''
         Script to convert an aligned amino acid fasta file to an aligned nucleotide file on a codon-by-codon basis
         given corresponding raw files. Does NOT check that codons and amino acids match perfectly.
 
-        usage: python nucleotide_for_aa.py <amino_acid_fasta> <nucleotide_fasta> <output_fasta>'''
+        usage: python nucleotide_for_aa.py <amino_acid_fasta> <nucleotide_fasta> <output_fasta>''')
         sys.exit(0)
     else:
         make_nuke_alignment_from_aa(aafi,nucfi,outfi)

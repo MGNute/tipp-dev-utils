@@ -1,9 +1,13 @@
 '''
 Miscellaneous functions created when building the 2019 reference packages.
+
+    --  Functions that start with "CV_" were
+        created specifically in the process of generating the cross-validation reference packages, i.e. with 25% of the
+        genomes in the simulated data removed from the reference package.
 '''
 
 __author__ = 'Michael'
-import os, sys
+import os, sys, json
 import numpy as np
 import dendropy
 from phylogeny_utilities.utilities import *
@@ -13,6 +17,10 @@ from phylogeny_utilities.utilities import *
 #
 tippref_fold='/projects/tallis/nute/data/tippref_2018'
 outfold=os.path.join(tippref_fold,'COGS_sequence_metadata')
+tipp2_fold = '/projects/tallis/nute/work/metagenomics/tipp2new'
+full_refpkg ='/projects/tallis/nute/data/tipp-2018'
+holdout = os.path.join(tippref_fold,'holdout')
+
 
 # lookup files (see notes later):
 file_ids = os.path.join(tippref_fold, 'ncbi_refseq_intermediate_files', 'file-list-lookup.txt')
@@ -31,20 +39,23 @@ cogs = ['COG0012','COG0016','COG0018','COG0048','COG0049','COG0052',
 
 # These three will be various lookups imported from files
 #   whose values get assigned in the function that follows.
-fll = None
-fll_rev = None
+file_name_lookup = None
+file_name_lookup_reverse = None
 file_to_assembly_accn = None
 old_seq_to_segID = {}
 
-fa_path='pasta.fasta'
-tr_path='pasta.tree'
-tr_out_path='pasta.tree.dedup'
-dedup_data_out_path='dedup_name_map.json'
-import os, json
+def test_dedup_tree_and_mapping():
+    # tested this from within a COG folder.
+    fap='pasta.fasta'
+    trp='pasta.tree'
+    tr_out='pasta.tree.dedup'
+    dd_out='dedup_name_map.json'
+    make_dedup_tree_and_mappingJSON(fap, trp, tr_out, dd_out)
 
 def make_dedup_tree_and_mappingJSON(fa_path, tr_path, tr_out_path, dedup_data_out_path):
     '''
-
+    Makes the files 'pasta.tree.dedup' and 'dedup_name_map.json' for the TIPP reference
+    package.
     :param fa_path:
     :param tr_path:
     :param tr_out_path:
@@ -65,11 +76,6 @@ def make_dedup_tree_and_mappingJSON(fa_path, tr_path, tr_out_path, dedup_data_ou
             'deduped_name_to_equivalence_class': tax_lab_to_class
             }, dd_f)
     dd_f.close()
-
-
-
-
-
 
 def make_lookups():
     print("\t...making file id lookups")
@@ -187,10 +193,31 @@ def checking_dupe_effects_make_cog_metadata(mycog):
 '''
 All of the code below was created to generate the holdout datasets for the 2019 references for testing.
 '''
-# some relevant locations:
-tipp2_fold = '/projects/tallis/nute/work/metagenomics/tipp2new'
-full_refpkg ='/projects/tallis/nute/data/tipp-2018'
-holdout = os.path.join(tippref_fold,'holdout')
+
+def CV_copy_ref_for_holdout(cog, fold, excl_d=None):
+    '''
+    NOTE: THIS FUNCTION IS INCOMPLETE!!
+    Makes a copy of the reference package that excludes the holdout data
+    :param cog:
+    :param fold:
+    :param excl_d: dictionary created in the function above.
+    :return:
+    '''
+    if excl_d is None:
+        excl_d = CV_get_seqs_to_exclude()
+    fold=str(fold)
+    orig=os.path.join(full_refpkg, cog + '.refpkg')
+    newf=os.path.join(holdout,'f'+fold, cog + '.refpkg')
+
+    #first copy the easy stuff, which requires no changing:
+    easy_files = ['all_taxon.taxonomy', 'pasta.hmm', 'pasta.taxonomy.RAxML_info','pasta.tree.RAxML_info']
+    for f in easy_files:
+        od = os.path.join(orig,f)
+        nw = os.path.join(newf,f)
+        os.system('cp %s %s' % (od, nw))
+
+    CV_make_pasta_subalignment(cog, fold, excl_d)
+    # TODO: Add code to make the pasta copy and the tree copies:
 
 def CV_get_seqs_to_exclude():
     '''
@@ -225,30 +252,6 @@ def CV_get_seqs_to_exclude():
         excl[int(a[0])][a[1]].append(a[2])
     return excl
 
-def CV_copy_ref_for_holdout(cog, fold, excl_d=None):
-    '''
-    NOTE: THIS FUNCTION IS INCOMPLETE!!
-    Makes a copy of the reference package that excludes the holdout data
-    :param cog:
-    :param fold:
-    :param excl_d: dictionary created in the function above.
-    :return:
-    '''
-    if excl_d is None:
-        excl_d = get_seqs_to_exclude()
-    fold=str(fold)
-    orig=os.path.join(full_refpkg, cog + '.refpkg')
-    newf=os.path.join(holdout,'f'+fold, cog + '.refpkg')
-
-    #first copy the easy stuff, which requires no changing:
-    easy_files = ['all_taxon.taxonomy', 'pasta.hmm', 'pasta.taxonomy.RAxML_info','pasta.tree.RAxML_info']
-    for f in easy_files:
-        od = os.path.join(orig,f)
-        nw = os.path.join(newf,f)
-        os.system('cp %s %s' % (od, nw))
-
-    # TODO: Add code to make the pasta copy and the tree copies:
-
 def CV_make_pasta_subalignment(cog,part, excl_d=None):
     '''
     Makes the pasta.fasta files for the CV references.
@@ -257,15 +260,21 @@ def CV_make_pasta_subalignment(cog,part, excl_d=None):
     :param excl_d:
     :return:
     '''
+    import json
     if excl_d is None:
-        excl_d = get_seqs_to_exclude()
-    part=str(part)
-    seqs2excl = excl_d[part][cog]
-    origf=os.path.join(full_refpkg, cog + '.refpkg')
-    newf=os.path.join(holdout,'f'+fold, cog + '.refpkg')
+        excl_d = CV_get_seqs_to_exclude()
+    seqs2excl = excl_d[int(part)][cog]
+    origf=os.path.join(full_refpkg, 'refpkg', cog + '.refpkg')
+    newf=os.path.join(holdout,'f'+str(part), 'refpkg', cog + '.refpkg')
 
     old_fasta = read_from_fasta(os.path.join(origf,'pasta.fasta'))
-    old_seq2eq, old_eq = get_fasta_duplicate_datastruct(old_fasta)
+    old_dupe_data_f = open(os.path.join(origf,'dedup_name_map.json'),'r')
+    old_dupe_data = json.load(old_dupe_data_f)
+    old_dupe_data_f.close()
+
+    old_seq2eq = old_dupe_data['fasta_names_to_equiv_class']
+    old_eq = old_dupe_data['fasta_equivalence_class_definitions']
+    # old_seq2eq, old_eq = get_fasta_duplicate_datastruct(old_fasta)
 
     # (1) - write out the new pasta.fasta
     new_fasta = dict(filter(lambda x: False if x[0] in seqs2excl else True, old_fasta.items()))
@@ -274,11 +283,93 @@ def CV_make_pasta_subalignment(cog,part, excl_d=None):
     write_to_fasta(os.path.join(newf, 'pasta.fasta'), new_fasta)
 
     # (2) - update the duplicate data for the reduced structure
-    fasta_reduced=read_from_fasta('pasta.fasta.reduced.fasta')
-    new_eq = old_eq.copy()
-    for s in seqs2excl:
-        new_eq[old_seq2eq[s]]['members'].remove(s)
-        new_eq[old_seq2eq[s]]['copynum']-=1
+    tr=dendropy.Tree.get(path = os.path.join(origf, 'pasta.tree.dedup'), schema='newick', preserve_underscores=True)
+    seqs2excl_singles = list(filter(lambda x: old_eq[str(old_seq2eq[x])]['copynum']>1, seqs2excl))
+    tr2=tr.extract_tree_without_taxa_labels(seqs2excl_singles)
+    tr2_seqnames = list(map(lambda x: x.taxon.label, tr2.leaf_node_iter()))
+    tr2.write(path = os.path.join(newf, 'pasta.tree.dedup'), schema='newick')
+    del tr, tr2
+    print('wrote deduped tree')
+
+    tr = dendropy.Tree.get(path=os.path.join(origf, 'pasta.tree'), schema='newick', preserve_underscores=True)
+    tr2 = tr.extract_tree_without_taxa_labels(seqs2excl)
+    tr2.write(path=os.path.join(newf, 'pasta.tree'), schema='newick')
+    del tr, tr2
+    print('wrote regular tree')
+
+    tax = dendropy.Tree.get(path=os.path.join(origf, 'pasta.taxonomy'), schema='newick', preserve_underscores=True)
+    tax2 = tax.extract_tree_without_taxa_labels(seqs2excl)
+    tax2.write(path=os.path.join(newf, 'pasta.taxonomy'), schema='newick')
+    del tax, tax2
+    print('wrote taxonomy')
+
+    sm = get_dict_from_file(os.path.join(origf, 'species.mapping'), ',')
+    sm2 = dict(filter(lambda x: False if x[0] in seqs2excl else True, sm.items()))
+    write_dict_to_file(sm2, os.path.join(newf, 'species.mapping'), ',')
+    print('done with %s, part %s' % (cog, part))
+
+
+def CV_replace_dedup_tree(cog,part, excl_d=None):
+    '''
+    Makes the pasta.tree files for the CV references.
+    :param cog:
+    :param part:
+    :param excl_d:
+    :return:
+    '''
+    import json
+    if excl_d is None:
+        excl_d = CV_get_seqs_to_exclude()
+    seqs2excl = excl_d[int(part)][cog]
+    origf=os.path.join(full_refpkg, 'refpkg', cog + '.refpkg')
+    newf=os.path.join(holdout,'f'+str(part), 'refpkg', cog + '.refpkg')
+
+    old_dupe_data_f = open(os.path.join(origf,'dedup_name_map.json'),'r')
+    old_dupe_data = json.load(old_dupe_data_f)
+    old_dupe_data_f.close()
+
+    old_seq2eq = old_dupe_data['fasta_names_to_equiv_class']
+    old_eq = old_dupe_data['fasta_equivalence_class_definitions']
+    # old_seq2eq, old_eq = get_fasta_duplicate_datastruct(old_fasta)
+
+
+    # (2) - update the duplicate data for the reduced structure
+    tr=dendropy.Tree.get(path = os.path.join(origf, 'pasta.tree.dedup'), schema='newick', preserve_underscores=True)
+    seqs2excl_singles = list(filter(lambda x: old_eq[str(old_seq2eq[x])]['copynum']==1, seqs2excl))
+    seqs2excl_doubles = list(set(seqs2excl).difference(seqs2excl_singles))
+    seqs2rename = list(set(seqs2excl_doubles).intersection(set(map(lambda x: x.taxon.label, tr.leaf_node_iter()))))
+    print(seqs2rename)
+    for s in seqs2rename:
+        n = tr.find_node_with_taxon_label(s)
+        n_eq = old_seq2eq[s]
+        cand_names = list(set(old_eq[str(n_eq)]['members']).difference(set(seqs2excl)))
+        if len(cand_names)==0:
+            seqs2excl_singles.append(s)
+        else:
+            n.taxon.label = cand_names[0]
+    tr2 = tr.extract_tree_without_taxa_labels(seqs2excl_singles)
+    tr2.write(path = os.path.join(newf, 'pasta.tree.dedup'), schema='newick')
+    del tr, tr2
+    print('wrote deduped tree')
+    #
+    # tr = dendropy.Tree.get(path=os.path.join(origf, 'pasta.tree'), schema='newick', preserve_underscores=True)
+    # tr2 = tr.extract_tree_without_taxa_labels(seqs2excl)
+    # tr2.write(path=os.path.join(newf, 'pasta.tree'), schema='newick')
+    # del tr, tr2
+    # print('wrote regular tree')
+    #
+    # tax = dendropy.Tree.get(path=os.path.join(origf, 'pasta.taxonomy'), schema='newick', preserve_underscores=True)
+    # tax2 = tax.extract_tree_without_taxa_labels(seqs2excl)
+    # tax2.write(path=os.path.join(newf, 'pasta.taxonomy'), schema='newick')
+    # del tax, tax2
+    # print('wrote taxonomy')
+    #
+    # sm = get_dict_from_file(os.path.join(origf, 'species.mapping'), ',')
+    # sm2 = dict(filter(lambda x: False if x[0] in seqs2excl else True, sm.items()))
+    # write_dict_to_file(sm2, os.path.join(newf, 'species.mapping'), ',')
+    # print('done with %s, part %s' % (cog, part))
+
+
 
 def test_codon_aa_matching(cog):
     '''
