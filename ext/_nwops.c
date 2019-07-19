@@ -15,27 +15,46 @@ static char print_string_lens_docstring[] =
 static char get_version_docstring[] =
         "Just prints the version number of this module. For easy testing that import is ok.";
 static char nw_most_matches_docstring[] =
-        "Gets the NW-Score where m=1 and all other values are 0. Equivalent identifying the"
+        "Gets the NW-Score where m=1 and all other values are 0. Equivalent identifying the\n"
         "largest possible set of matches betwen the sequences";
 static char get_best_startpos_docstring[] =
-        "Uses the NW score (d=-1,m=1,g=-2) to decide which of the three sequences is best. "
-        "Usage: find_best_start_pos(seq1, seq2, seq3, seq_protein) where seq1-seq3 are each"
-        "of the 3 frame-shifted translations of the nucleotide sequence, and 'seq_protein' "
-        "is the actual amino acid sequence. Returns a tuple of:"
-        "   (frame_pos, match_ct, gap_ct, diff_ct, maxres, aln1, alnP)"
-        "   where frame_pos is the frame-shift value (0, 1 or 2), max res is the score of  "
-        "   best result, match_ct/gap_ct/diff_ct are the match/gap/difference counts of the"
-        "   best result, and finally aln1 and alnP are the aligned versions of the "
+        "Uses the NW score (d=-1,m=1,g=-2) to decide which of the three sequences is best. \n"
+        "                                                                                  \n"
+        "Usage: find_best_start_pos(seq1, seq2, seq3, seq_protein) where seq1-seq3 are each\n"
+        "of the 3 frame-shifted translations of the nucleotide sequence, and 'seq_protein' \n"
+        "is the actual amino acid sequence. Returns a tuple of:                            \n"
+        "   (frame_pos, match_ct, gap_ct, diff_ct, maxres, aln1, alnP)                     \n"
+        "   where frame_pos is the frame-shift value (0, 1 or 2), max res is the score of  \n"
+        "   best result, match_ct/gap_ct/diff_ct are the match/gap/difference counts of the\n"
+        "   best result, and finally aln1 and alnP are the aligned versions of the         \n"
         "   sequences.";
 static char get_pairwise_alignment_docstring[] =
-        "retrieves the actual pairwise alignment for the two strings under a basic NW";
-static char get_pairwise_alignment_numpy_docstring[] =
-        "retrieves the actual pairwise alignment for the two strings under a basic NW, but"
-        "this version depends on getting arrays from numpy so the results can be analyzed"
-        "in python later.";
+        "retrieves the actual pairwise alignment for the two strings under a basic NW.     \n"
+        "                                                                                  \n"
+        "Usage:    get_pairwise_alignment(seq1, seq2, Fmat, Dmat)                          \n"
+        "    where seq1, seq2 are strings that should be aligned. Fmat and Dmat should be  \n"
+        "    2d Numpy arrays of type 'int32' and should be of size ( len(seq1) + 1,        \n"
+        "    len(seq2) + 1). During the routine, Fmat is populated with the DP matrix      \n"
+        "    computed during the NW algorithm. Dmat is populated with the \"arrows\" to get\n"
+        "    the optimal path through the matrix, from top right to bottom left, where     \n"
+        "    0 = from the left, 1 = from diagonal, and 2 = from above.                     \n"
+        "                                                                                  \n"
+        "Returns a tuple of:                                                               \n"
+        "    (int) alignment length                                                        \n"
+        "    (int) number of gaps                                                          \n"
+        "    (int) best NW score                                                           \n"
+        "    (str) aligned Sequence 1                                                      \n"
+        "    (str) aligned Sequence 2                                                      \n"
+        "";
 static char test_numpy_data_exchange_docstring[] =
-        "This just takes some data in the form of numpy arrays, makes some small changes,"
-        "and then releases them. We are checking to see if the changes persist";
+        "This just takes some data in the form of numpy arrays, makes some small changes, \n"
+        "and then releases them, then checking to see if the changes persist. This was    \n"
+        "a function I wrote for testing a while ago and didn't delete.                    \n"
+        "\n"
+        "Usage: test_numpy_data_exchange(int_arr, doub_arr), where int_arr is a 2-d numpy \n"
+        "array of type int64, and doub_arr is a 2-d numpy array of type float64. This     \n"
+        "function currently just adds 1 to every entry in the int_arr, and separately     \n"
+        "prints the shapes of the two arrays.";
 
 /* Available functions */
 static PyObject *nwops_testPrintStringSizes(PyObject *self, PyObject *args);
@@ -43,8 +62,9 @@ static PyObject *nwops_getVersionString(PyObject *self, PyObject *args);
 static PyObject *nwops_getMostMatches(PyObject *self, PyObject *args);
 static PyObject *nwops_getStartFrameByMatchCt(PyObject *self, PyObject *args);
 static PyObject *nwops_getPairwiseAlignment(PyObject *self, PyObject *args);
-static PyObject *nwops_getPairwiseAlignment_toNumpy(PyObject *self, PyObject *args);
+static PyObject *nwops_getPairwiseAlignment_testOpt(PyObject *self, PyObject *args);
 static PyObject *nwops_testNumpyDataExchange(PyObject *self, PyObject *args);
+static PyObject *nwops_change_data(PyObject *self, PyObject *args);
 
 /* Module specification */
 static PyMethodDef module_methods[] = {
@@ -53,8 +73,9 @@ static PyMethodDef module_methods[] = {
         {"nw_most_matches", nwops_getMostMatches, METH_VARARGS, nw_most_matches_docstring},
         {"find_best_start_pos", nwops_getStartFrameByMatchCt, METH_VARARGS, get_best_startpos_docstring},
         {"get_pairwise_alignment", nwops_getPairwiseAlignment, METH_VARARGS, get_pairwise_alignment_docstring},
-        {"get_pairwise_alignment_tonumpy", nwops_getPairwiseAlignment_toNumpy, METH_VARARGS, get_pairwise_alignment_numpy_docstring},
-        {"test_numpy_data_exchange", nwops_testNumpyDataExchange, METH_VARARGS, test_numpy_data_exchange_docstring},
+//        {"get_pairwise_alignment_test", nwops_getPairwiseAlignment_testOpt, METH_VARARGS, get_pairwise_alignment_numpy_docstring},
+//        {"test_numpy_data_exchange", nwops_testNumpyDataExchange, METH_VARARGS, test_numpy_data_exchange_docstring},
+        {"test_numpy_data_mod", nwops_change_data, METH_VARARGS, test_numpy_data_exchange_docstring},
 //        {"pre_process_order_children", treeops_preProcOrderChildren, METH_VARARGS, pre_proc_order_children_docstring},
 //        {"get_version", treeops_getVersionString, METH_VARARGS, get_version_docstring},
 //        {"relocate_tree_by_deflection_or_edge_angle", treeops_relocateTreeByDeflectOrEdge, METH_VARARGS, relocate_by_deflection_edge_docstring},
@@ -172,13 +193,10 @@ static PyObject *nwops_getStartFrameByMatchCt(PyObject *self, PyObject *args)
     return ret;
 }
 
-
-static PyObject *nwops_getPairwiseAlignment(PyObject *self, PyObject *args)
+static PyObject *nwops_getPairwiseAlignment_old(PyObject *self, PyObject *args)
 {
-    // Finds which of the three frame sequences has the best alignemtn
-    // Returns now just the match count but the frame position that that inmplies.
+    // Computes the pairwise
 
-//    PyObject *p_positions, *n_positions;
     PyObject *fmat, *dmat;
     long d, m, g, a;
 //    long maxres;    // (d)ifference, (m)atch, (g)ap, (a)sterisk
@@ -194,26 +212,21 @@ static PyObject *nwops_getPairwiseAlignment(PyObject *self, PyObject *args)
         return NULL;
 
     /* Interpret the input objects as numpy arrays. */
-    PyObject *fmat_array = PyArray_FROM_OTF(fmat, NPY_LONG, NPY_ARRAY_IN_ARRAY);
-    PyObject *dmat_array = PyArray_FROM_OTF(dmat, NPY_LONG, NPY_ARRAY_IN_ARRAY);
+    PyObject *fmat_array = PyArray_FROM_OTF(fmat, NPY_LONG, NPY_ARRAY_INOUT_ARRAY);
+    PyObject *dmat_array = PyArray_FROM_OTF(dmat, NPY_LONG, NPY_ARRAY_INOUT_ARRAY);
 
     /* If that didn't work, throw an exception. */
-//    if (p_pos_array == NULL || n_pos_array == NULL) {
     if (fmat_array == NULL || dmat_array == NULL) {
         Py_XDECREF(dmat_array);
         Py_XDECREF(fmat_array);
         return NULL;
     }
 
-    /* How many data points are there? */
-//    int p_arr_len = (int)PyArray_DIM(p_pos_array, 0);
-//    int n_arr_len = (int)PyArray_DIM(n_pos_array, 0);
-
     /* Get pointers to the data as C-types. */
     long *f_mat_ptr = (long*)PyArray_DATA(fmat_array);
     long *d_mat_ptr = (long*)PyArray_DATA(dmat_array);
 
-    /* Call the external C function to compute the new angles. */
+    /* Call the external C function. */
     int totlen;
     int j = 0;
     long bestscore = 0;
@@ -244,21 +257,20 @@ static PyObject *nwops_getPairwiseAlignment(PyObject *self, PyObject *args)
     free(aln_prot);
     free(aln_nuke);
 
-
     return ret;
 }
 
-static PyObject *nwops_getPairwiseAlignment_toNumpy(PyObject *self, PyObject *args)
+//static PyObject *nwops_getPairwiseAlignment_toNumpy(PyObject *self, PyObject *args)
+static PyObject *nwops_getPairwiseAlignment(PyObject *self, PyObject *args)
 {
-    // This is going to execult the pairwise alignment for two sequences, but it
-    // is going to use everything taken carefully from python so that it will return
-    // the data for analysis.
+    // Computes the pairwise alignment of two input sequences. Optionally takes
+    // two numpy array arguments that will be populated for analysis in Python.
 
-    PyObject *p_str_pyo, *n_str_pyo, *Fmat_pyo, *dirmat_pyo;
-//    PyObject *Fmat_pyo, *dirmat_pyo;
+    PyObject *fmat = NULL;
+    PyObject *dmat = NULL;
     long d, m, g, a;
-    // (d)ifference, (m)atch, (g)ap, (a)sterisk
-     d = 0; m = 1; g = 0; a = 0;
+//    long maxres;    // (d)ifference, (m)atch, (g)ap, (a)sterisk
+    d = 0; m = 1; g = 0; a = 0;
 
     char *s_prot;
     char *s_nuke; //also a protein, but from a nuke originally
@@ -266,187 +278,132 @@ static PyObject *nwops_getPairwiseAlignment_toNumpy(PyObject *self, PyObject *ar
     int n_gaps, aln_length;
 
     /* Parse the input tuple */
-//    if (!PyArg_ParseTuple(args, "s#s#OOOOiiii",&s_prot,&l_prot, &s_nuke, &l_nuke, &p_str_pyo, &n_str_pyo,
-//                            &Fmat_pyo, &dirmat_pyo, &d, &m, &g, &a))
-    if (!PyArg_ParseTuple(args, "s#s#OOOO", &s_prot, &l_prot, &s_nuke, &l_nuke, &p_str_pyo, &n_str_pyo, &Fmat_pyo, &dirmat_pyo))
+    if (!PyArg_ParseTuple(args, "s#s#|OO",&s_prot,&l_prot, &s_nuke, &l_nuke, &fmat, &dmat))
         return NULL;
-//    if (!PyArg_ParseTuple(args, "s#s#OO",&s_prot,&l_prot, &s_nuke, &l_nuke, &Fmat_pyo, &dirmat_pyo))
-//        return NULL;
 
-    /* Interpret the input objects as numpy arrays. */
-    PyArrayObject  *p_str_uint8 = PyArray_FROM_OTF(p_str_pyo, NPY_UINT8, NPY_ARRAY_IN_ARRAY);
-    PyArrayObject  *n_str_uint8 = PyArray_FROM_OTF(n_str_pyo, NPY_UINT8, NPY_ARRAY_IN_ARRAY);
-    PyArrayObject  *Fmat_AO = PyArray_FROM_OTF(Fmat_pyo, NPY_INT64, NPY_ARRAY_IN_ARRAY);
-    PyArrayObject  *dirmat_AO = PyArray_FROM_OTF(dirmat_pyo, NPY_INT64, NPY_ARRAY_IN_ARRAY);
+    long *f_mat_ptr;
+    long *d_mat_ptr;
 
-    /* If that didn't work, throw an exception. */
-    if (p_str_uint8 == NULL || n_str_uint8 == NULL || Fmat_AO == NULL || dirmat_AO == NULL ) {
-//    if (Fmat_AO == NULL || dirmat_AO == NULL ) {
-        Py_XDECREF(p_str_uint8);
-        Py_XDECREF(n_str_uint8);
-        Py_XDECREF( Fmat_AO );
-        Py_XDECREF( dirmat_AO );
-        return NULL;
+    PyObject *fmat_array;
+    PyObject *dmat_array;
+
+    if (fmat)
+    {
+        /* Interpret the input objects as numpy arrays. */
+        fmat_array = PyArray_FROM_OTF(fmat, NPY_LONG, NPY_ARRAY_INOUT_ARRAY); //Interpret as numpy array
+        if (fmat_array == NULL) {
+            Py_XDECREF(fmat_array); // Kill and throw exception on failure.
+            return NULL;
+        }
+        f_mat_ptr = (long*)PyArray_DATA(fmat_array); //Get pointer to data as C-type.
+    } else {
+        f_mat_ptr = (long *)malloc((l_nuke+2) * (l_prot+2) * sizeof(long));
     }
 
+    if (dmat)
+    {
+        dmat_array = PyArray_FROM_OTF(dmat, NPY_LONG, NPY_ARRAY_INOUT_ARRAY);
+        if (dmat_array == NULL) {
+            Py_XDECREF(dmat_array);
+            return NULL;
+        }
+        d_mat_ptr = (long*)PyArray_DATA(dmat_array);
+    } else {
+        d_mat_ptr = (long *)malloc((l_nuke+2) * (l_prot+2) * sizeof(long));
+    }
 
-    /* Get pointers to the data as C-types. */
-        // int *p_str_ptr = (int*)PyArray_DATA(p_pos_array);
-        // int *n_str_ptr = (int*)PyArray_DATA(n_pos_array);
-    char *p_str_ptr = (char*)PyArray_DATA(p_str_uint8);
-    char *n_str_ptr = (char*)PyArray_DATA(n_str_uint8);
-    long *Fmat_ptr = (long*)PyArray_DATA(Fmat_AO);
-    long *dirmat_ptr = (long*)PyArray_DATA(dirmat_AO);
-
-    /* Call the external C function to compute the new angles. */
+    /* Call the external C function. */
     int totlen;
+    int j = 0;
+    long bestscore = 0;
     totlen= l_nuke + l_prot;
     char *aln_prot = (char *)malloc(totlen + 1);
     char *aln_nuke = (char *)malloc(totlen + 1);
-
-//    long* myFmat = (long *)malloc((l_nuke+2) * (l_prot+2) * sizeof(long));
-//    long* dirmat = (long *)malloc((l_nuke+2) * (l_prot+2) * sizeof(long));
-
-    getNeedleAlignment(l_prot, s_prot, l_nuke, s_nuke, Fmat_ptr, d, m, g, a,
-                       aln_prot, aln_nuke, dirmat_ptr, &aln_length, &n_gaps);
-
-//    populate_position_array_from_string(aln_prot, p_position_ptr, p_arr_len);
-//    populate_position_array_from_string(aln_nuke, n_position_ptr, n_arr_len);
-
-    int i;
-    for (i=0; i<aln_length; i++)
-    {
-        p_str_ptr[i] = aln_prot[i];
-        n_str_ptr[i] = aln_nuke[i];
+    for (j=0; j<totlen+1; j++) {
+        aln_prot[j]=0;
+        aln_nuke[j]=0;
     }
 
+    bestscore = getNeedleAlignment(l_prot, s_prot, l_nuke, s_nuke, f_mat_ptr, d, m, g, a,
+                                   aln_prot, aln_nuke, d_mat_ptr, &aln_length, &n_gaps);
 
-//    free(myFmat);
-//    free(dirmat);
+//    /* Clean up. */
+    if (!fmat) {
+        free(f_mat_ptr);
+    } else {
+        Py_XDECREF(fmat_array);
+    }
+    if (!dmat) {
+        free(d_mat_ptr);
+    } else {
+        Py_XDECREF(dmat_array);
+    }
+
+//    /* Build the output tuple */
+    PyObject *ret = Py_BuildValue("lllss", aln_length, n_gaps, bestscore, aln_prot, aln_nuke);
+
     free(aln_prot);
     free(aln_nuke);
 
-    /* Clean up. */
-    Py_XDECREF(p_str_uint8);
-    Py_XDECREF(n_str_uint8);
-    Py_DECREF(dirmat_AO);
-    Py_DECREF(Fmat_AO);
-
-    /* Build the output tuple */
-    PyObject *ret = Py_BuildValue("ll", aln_length, n_gaps);
     return ret;
 }
 
-static PyObject *chi2_move_data(PyObject *self, PyObject *args)
+static PyObject *nwops_change_data(PyObject *self, PyObject *args)
 {
-    PyObject *Fmat_pyo, *dirmat_pyo;
-    printf("ok, we are starting the function at the top\n");
+    PyObject *int_mat_pyo, *doub_mat_pyo;
 
-    if (!PyArg_ParseTuple(args, "OO",&Fmat_pyo, &dirmat_pyo))
+
+    /* Parse the input tuple */
+    if (!PyArg_ParseTuple(args, "OO",&int_mat_pyo, &doub_mat_pyo))
     {
         return NULL;
     }
-    PyArrayObject  *Fmat_AO;
-    PyArrayObject  *dirmat_AO;
-    printf("state 2\n");
+//    PyArrayObject  *int_mat_AO;
+//    PyArrayObject  *doub_mat_AO;
+    PyObject  *int_mat_AO;
+    PyObject  *doub_mat_AO;
 
     /* Interpret the input objects as numpy arrays. */
-    Fmat_AO = PyArray_FROM_OTF(Fmat_pyo, NPY_INT64, NPY_ARRAY_IN_ARRAY);
-    dirmat_AO = PyArray_FROM_OTF(dirmat_pyo, NPY_INT64, NPY_ARRAY_IN_ARRAY);
+    int_mat_AO = PyArray_FROM_OTF(int_mat_pyo, NPY_INT64, NPY_ARRAY_INOUT_ARRAY);
+    doub_mat_AO = PyArray_FROM_OTF(doub_mat_pyo, NPY_FLOAT64, NPY_ARRAY_INOUT_ARRAY);
 
     /* If that didn't work, throw an exception. */
-    if (Fmat_AO == NULL || dirmat_AO == NULL ) {
-        Py_XDECREF( Fmat_AO );
-        Py_XDECREF( dirmat_AO );
-        return NULL;
-    }
-    printf("state 3\n");
-
-     /* How many data points are there? */
-    int Nr = (int)PyArray_DIM(Fmat_AO, 0);
-    int Nc = (int)PyArray_DIM(Fmat_AO, 1);
-    printf("Size of F is: (%d , %d)\n", Nr, Nc);
-
-    /* Get pointers to the data as C-types. */
-    long *Fmat_ptr = (long*)PyArray_DATA(Fmat_AO);
-    long *dirmat_ptr = (long*)PyArray_DATA(dirmat_AO);
-    printf("state 4\n");
-
-    Fmat_ptr[0]=100;
-    int ct;
-    ct = 0;
-    int i, j;
-    for (i=0; i<Nr; i++) {
-        for (j=0; j<Nc; j++) {
-            Fmat_ptr[j*Nc+i]=i+j;
-        }
-    }
-
-    printf("just got past changing the matrics\n");
-
-
-    Py_DECREF(dirmat_AO);
-    Py_DECREF(Fmat_AO);
-
-    /* Build the output tuple */
-    Py_INCREF(Py_None);
-    return Py_None;
-}
-
-static PyObject *nwops_testNumpyDataExchange(PyObject *self, PyObject *args)
-{
-    int node, away;
-    PyObject *lens, *topo;
-
-    /* Parse the input tuple */
-    if (!PyArg_ParseTuple(args, "OO", &lens, &topo))
-        return NULL;
-
-    /* Interpret the input objects as numpy arrays. */
-    PyObject *len_array = PyArray_FROM_OTF(lens, NPY_DOUBLE, NPY_IN_ARRAY);
-    PyObject *topo_array = PyArray_FROM_OTF(topo, NPY_INT, NPY_IN_ARRAY);
-
-    /* If that didn't work, throw an exception. */
-    if (len_array == NULL || topo_array == NULL ) {
-        Py_XDECREF(len_array);
-        Py_XDECREF(topo_array);
+    if (int_mat_AO == NULL || doub_mat_AO == NULL ) {
+        Py_XDECREF( int_mat_AO );
+        Py_XDECREF( doub_mat_AO );
         return NULL;
     }
 
     /* How many data points are there? */
-    int n_topo, n_lens;
-    n_topo = (int)PyArray_DIM(topo_array, 0);
-    n_lens = (int)PyArray_DIM(len_array, 0);
-    printf("n_topo: %d,  n_lens: %d", n_topo, n_lens);
+    int Nint1 = (int)PyArray_DIM(int_mat_AO, 0);
+    int Nint2 = (int)PyArray_DIM(int_mat_AO, 1);
+    int Ndoub1 = (int)PyArray_DIM(doub_mat_AO, 0);
+    int Ndoub2 = (int)PyArray_DIM(doub_mat_AO, 1);
+    printf("int matrix is: (%d , %d), doub matrix is (%d, %d)\n", Nint1, Nint2, Ndoub1, Ndoub2);
 
     /* Get pointers to the data as C-types. */
-    double *len_ptr    = (double*)PyArray_DATA(len_array);
-    int *topo_ptr    = (int*)PyArray_DATA(topo_array);
+    long long *int_mat_ptr = (long long*)PyArray_DATA(int_mat_AO);
+    double *doub_mat_ptr = (double*)PyArray_DATA(doub_mat_AO);
 
-    /* Call the external C function to compute the chi-squared. */
-//    double value = maxLengthToTip( len_ptr, topo_ptr, node, away);
-    int i;
-    double val;
-    for (i=0; i<n_topo; i++) {
-        topo_ptr[i] = i;
+    int ct;
+    ct = 0;
+    int i, j;
+
+    for (i=0; i<Nint1; i++) {
+        for (j=0; j<Nint2; j++) {
+            int_mat_ptr[i*Nint2+j]++;
+        }
     }
-    for (i=0; i<n_lens; i++) {
-        len_ptr[i] += 0.5;
+    for (i=0; i<Ndoub1; i++) {
+        for (j=0; j<Ndoub2; j++) {
+            doub_mat_ptr[i*Ndoub2+j]+=0.5;
+        }
     }
-    val = len_ptr[n_lens - 1] + 3.14;
 
-
-    /* Clean up. */
-    Py_DECREF(len_array);
-    Py_DECREF(topo_array);
-
-    if (val < 0.0) {
-        PyErr_SetString(PyExc_RuntimeError,
-                        "maxLengthToTip returned an impossible value.");
-        return NULL;
-    }
+    Py_DECREF(doub_mat_AO);
+    Py_DECREF(int_mat_AO);
 
     /* Build the output tuple */
-    PyObject *ret = Py_BuildValue("d", val);
-    return ret;
+    Py_INCREF(Py_None);
+    return Py_None;
 }

@@ -211,8 +211,10 @@ long getNeedleAlignment(int len1, char* seq1, int len2, char* seq2, long* F, lon
                              long a, char* aln1, char* aln2, long* dirmat, int *aln_len, int *gapct)
 {
     int p, r, c, n_gaps;
-    long mat, del, ins, tmp, best_score;
-    int dir, dirtmp;
+//    long mat, del, ins, tmp;
+    long best_score;
+    int dir;
+//    int dirtmp;
 
     best_score = needleScore(len1, seq1, len2, seq2, F, d, m, g, a, dirmat);
 
@@ -281,7 +283,11 @@ void inplace_reverse(char * str)
 void populate_position_array_from_string(char *aln_seq, int *pos_arr, int pos_arr_len)
 {
     // This is just going to run along the string and write down the position
-    // whenever the character in the string is a non-blank.
+    // whenever the character in the string is a non-gap. So for the string
+    // 'ACT----GG' it will populate pos_arr to be: [0, 1, 2, -1, -1, -1, -1, 3, 4]
+    //      aln_seq: string to be analyzed.
+    //      pos_arr: array of positions, will be modified
+    //      pos_arr_len: length of the variable pos_arr, to avoid a segfault.
     int loc_in_seq, loc_in_posarr,  aln_length;
     loc_in_posarr=0;
     loc_in_seq = 0;
@@ -298,6 +304,10 @@ void populate_position_array_from_string(char *aln_seq, int *pos_arr, int pos_ar
             }
             pos_arr[loc_in_posarr]=loc_in_seq;
             loc_in_posarr++;
+        }
+        else
+        {
+            pos_arr[loc_in_posarr]=-1;
         }
     }
 }
